@@ -17,82 +17,92 @@ SCENT_SIZE = 45
 
 
 class ProgramRunner:
-    intro_image = """      ::::::::::::::.                 
-            . . ::..:-. ..                  
-            ....::..:::...                  
-            .::::==::.                    
-                ::.:-::-                     
-        ......:=-=+==-.....                
-        .=-------==++=========-              
-        =---------==--========              
-        =-----::::::::::=====-              
-        ------   :=.:   -====-              
-        :-----:**:=-.*: =====:              
-        ::----   .::.   -====:              
-        ::----          =====:              
-        ::----          -====:              
-        ::-----------========:              
-        :-------------=======:              
-        -:------------=======:              
-        :------------=-======:              
-        -------------========:              
-        :::::.... .  ....:::-:              
-        .::::::::::::::::::::.              
-        ..:..... .  . ....:::."""
+    intro_image = """        ::::::::::::::.                 
+        . . ::..:-. ..                  
+        ....::..:::...                  
+        .::::==::.                    
+            ::.:-::-                     
+    ......:=-=+==-.....                
+    .=-------==++=========-              
+    =---------==--========              
+    =-----::::::::::=====-              
+    ------  Welcome -====-              
+    :-----:** to *: =====:              
+    ::----  Zack's  -====:              
+    ::---- Fragrance ====:              
+    ::----  Finder  -====:              
+    ::-----------========:              
+    :-------------=======:              
+    -:------------=======:              
+    :------------=-======:              
+    -------------========:              
+    :::::.... .  ....:::-:              
+    .::::::::::::::::::::.              
+    ..:..... .  . ....:::.\n"""
     
-    instructions = ""
-    
-    def __init__(self):
-        pass
+    def __init__(self, filename):
+        self.data_handler = DataHandler(filename)
+        self.fragrance_sample = FragranceNode("", "", [], "")
 
-    def __str__(self):
+    def get_filter_one(self):
+        options = [key.title() for key in vars(self.fragrance_sample).keys() if key != 'next_node']
+        while True:     
+            try:   
+                print("Type a filter you'd like to sort by: ")
+                filter = input().title()
+                if filter in options:
+                    return filter
+                else:
+                    raise ValueError()
+            except ValueError:
+                print(f"Please select from: {options}")
+
+
         
-# TODO:
-# Adjust create_hashmap with new Tree class
-# to take input and return list of options
 class DataHandler:
     def __init__(self, filename):
-        self.data = self.load_data(filename)
-        self.filter_chars = {}
+        self.headers, self.data = self.load_data(filename)
+        self.filter_chars = WordTree()
         self.hashmaps = {}
 
     def load_data(self, filename):
         with open(filename, mode='r', encoding='utf-8') as file:
             csv_reader = csv.reader(file)
-            header = next(csv_reader)
+            headers = next(csv_reader)
+            data = list(csv_reader)
 
-        return list(csv_reader)
+        return headers, data
 
     def create_hashmap(self, filter_category, size):
+        headers = self.headers
         data = self.data
         hashmap = HashMap(size)
         self.hashmaps[f"{filter_category}"] = hashmap
+
+        header_map = {
+            "brand": headers.index("House"),
+            "name": headers.index("Perfume"),
+            "scent_categories": headers.index("Accords"),
+            "cost": headers.index("Cost")
+        }
         
         for row in data:
 
-            if len(row) < 4:
-                continue
+            brand = row[header_map["brand"]]
+            name = row[header_map["name"]]
+            scent_categories = row[header_map["scent_categories"]].split("; ")
+            cost = row[header_map["cost"]]
 
-            frag_node = FragranceNode(row[1], row[0], row[2].split(";"), row[3])
+            frag_node = FragranceNode(brand, name, scent_categories, cost)
             for key, value in frag_node.__dict__.items():
                 if key == filter_category:
                     if isinstance(value, list):
-
                         for attribute in value:
-                            first_letter = attribute[0].lower()
-                            if first_letter not in self.filter_chars:
-                                self.filter_chars[first_letter] = [attribute]
-                            elif attribute not in self.filter_chars[first_letter]:
-                                self.filter_chars[first_letter].append(attribute)
-
+                            self.filter_chars.insert_word(attribute)
                             hashmap.assign(attribute, frag_node)
-                    else:
-                        first_letter = value[0].lower()
-                        if first_letter not in self.filter_chars:
-                            self.filter_chars[first_letter] = [value]
-                        elif value not in self.filter_chars[first_letter]:
-                            self.filter_chars[first_letter].append(value)
 
+                    else:
+                        self.filter_chars.insert_word(value)
                         hashmap.assign(value, frag_node)
 
     def retrieve_data(self, main_category, filter):
@@ -101,9 +111,9 @@ class DataHandler:
 
 
 class FragranceNode:
-    def __init__(self, name: str, brand: str, scent_category:[str], cost: str):
-        self.name = name
+    def __init__(self, brand: str, name: str, scent_category:[str], cost: str):
         self.brand = brand
+        self.name = name
         self.scent_category = scent_category
         self.cost = cost
         self.next_node = None
@@ -175,7 +185,10 @@ class WordTree:
     def __init__(self):
         self.root = TreeNode("")
 
-    def insert_word(self, word: str, current_node: TreeNode, depth=0):
+    def insert_word(self, word: str, current_node: TreeNode=None, depth=0):
+            if current_node is None:
+                current_node = self.root
+            
             if depth == len(word):
                 return
 
@@ -189,36 +202,39 @@ class WordTree:
 
             self.insert_word(word, next_node, depth+1)
 
-    # TODO:
-    # Write find_word(s) function. Think iterative approach will
-    # work best. Needs to return all words that start with input
-    # from user.
-    def find_word(self, word: str):
-        current_node = self.root
+    def find_words(self, word: str, current_node: TreeNode = None, current_word="", list_of_words=None):
+        if list_of_words is None:
+            list_of_words = []
+        
+        if current_node is None:
+            current_node = self.root
 
-        for n in range(len(word)):
-            if word[n] not in self.root.children:
+        for letter in word:
+            if letter not in current_node.children:
                 return [None]
             
-            current_node = current_node.children[word[n]]
-    
-        list_of_words = []
-        num_of_words = 1
-        while num_of_words > 0:
-            if len(current_node.children.keys()) > 1:
+            current_node = current_node.children[letter]
 
+        current_word += word
+
+        def dfs(node, word_so_far):
+            if not node.children:
+                list_of_words.append(word_so_far)
+                return
+
+            for letter, child in node.children.items():
+                dfs(child, word_so_far + letter)
+
+        dfs(current_node, current_word)
+        return list_of_words
+          
 
         
-
-
-
-
-
-
-
 # main
 def main():
-    return
+    print(ProgramRunner.intro_image)
+    frag_finder = ProgramRunner(FRAG_FILE)
+    frag_finder.get_filter_one()
 
 
 
