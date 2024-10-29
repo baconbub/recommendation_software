@@ -13,7 +13,7 @@ import csv
 
 
 FRAG_FILE = 'Zach\'s Tried Fragrance List - non-formatted.csv'
-SCENT_SIZE = 100
+SCENT_SIZE = 80
 COST_SIZE = 6
 
 
@@ -76,8 +76,9 @@ class ProgramRunner:
                 print(f"Invalid input. Type {options}")
 
     def get_next_filter(self, first_filter):
+        filtered_first_filter = first_filter.replace("_", " ").title()
         while True:
-            print(f"Type the beginning of the {first_filter} and see if it's available: ")
+            print(f"Type the beginning letters of the {filtered_first_filter} and see if it's available: ")
             
             user_input = input().lower()
             options = self.data_handler.filter_chars.find_words(user_input)      
@@ -101,7 +102,8 @@ class ProgramRunner:
                         break
                     else:
                         print("Invalid input. Please type 'yes' or 'no'.")
-            
+    
+    # Combines get_first and get_next and adds control flow
     def get_all_filters(self):
         first_filter = self.get_filter_one()
         if first_filter == "cost":
@@ -121,12 +123,22 @@ class ProgramRunner:
             current_node = current_node.next_node
         print("\n------------------------------\n")
 
+    def again(self):
+        while True:
+            print("Would you like to find more fragrances?")
+            
+            response = input()
+            if response in {"y", "ye", "yes"}:
+                return True
+            elif response in {"n", "no"}:
+                return False
+            else:
+                print("Invalid input. Please type 'yes' or 'no'.")
         
 class DataHandler:
     def __init__(self):
         self.filename = self.parse_args()
         self.headers, self.data = self.load_data(self.filename)
-        self.filter_chars = WordTree()
         self.hashmaps = {}
 
     def parse_args(self):
@@ -141,17 +153,17 @@ class DataHandler:
             headers = next(csv_reader)
             data = list(csv_reader)
 
-        # for row in data:
-        #     print(row)
-
         return headers, data
 
     def create_hashmap(self, filter_category, size):
+        # Creates new wordtree and assigns new hashmap to corresponding dict key
+        self.filter_chars = WordTree()
         headers = self.headers
         data = self.data
         hashmap = HashMap(size)
         self.hashmaps[f"{filter_category}"] = hashmap
 
+        # Used to set the filters for each node
         header_map = {
             "Brand": headers.index("House"),
             "Name": headers.index("Perfume"),
@@ -168,27 +180,22 @@ class DataHandler:
 
             frag_node = FragranceNode(brand, name, scent_categories, cost)
             for key, value in frag_node.__dict__.items():
-                # print(f"Checking attribute '{key}' against filter category '{filter_category}'")
                 if key == filter_category:
+                    # If attribute of node has more than one value (e.g. scent_category)
                     if isinstance(value, list):
                         for attribute in value:
-                            # print(f"Adding fragrance: {frag_node.name} to category: {attribute}")
-
-                            # print(f"Inserting '{attribute}' into WordTree and HashMap.")
+                            # Assigns to hashmap/adds word to wordtree
                             self.filter_chars.insert_word(attribute)
-                            hashmap.assign(attribute, frag_node)
+                            hashmap.assign(attribute, FragranceNode(brand, name, scent_categories, cost))
 
                     else:
-                        # print(f"Inserting '{value}' into WordTree and HashMap.")
+                        # Assigns to hashmap/adds word to wordtree
                         self.filter_chars.insert_word(value)
-                        hashmap.assign(value, frag_node)
-
-        hashmap.print_entire_map()
+                        hashmap.assign(value, FragranceNode(brand, name, scent_categories, cost))
 
     def retrieve_data(self, main_category, filter):
         hashmap = self.hashmaps[f"{main_category}"]
         return hashmap.retrieve(filter)
-
 
 class FragranceNode:
     def __init__(self, brand: str, name: str, scent_category:[str], cost: str):
@@ -245,7 +252,7 @@ class HashMap:
 
         number_collisions = 0
         
-        while (True):
+        while True:
             hash_code = self.hash(key, number_collisions)
             array_index = self.compressor(hash_code)
             current_array_value = self.array[array_index]
@@ -265,45 +272,23 @@ class HashMap:
 
     def retrieve(self, key):
         key = key.lower()
+        retrieval_collisions = 0
+       
+        while retrieval_collisions < self.array_size:
 
-        array_index = self.compressor(self.hash(key))
-        possible_return_value = self.array[array_index]
+            hash_code = self.hash(key, retrieval_collisions)
+            array_index = self.compressor(hash_code)
 
-        if possible_return_value is None:
-            return None
-        
-        if possible_return_value[0] == key:
-            return possible_return_value[1]
-
-        retrieval_collisions = 1
-
-        while (possible_return_value != key):
-            new_hash_code = self.hash(key, retrieval_collisions)
-            retrieving_array_index = self.compressor(new_hash_code)
-            possible_return_value = self.array[retrieving_array_index]
+            possible_return_value = self.array[array_index]
 
             if possible_return_value is None:
                 return None
-            
             if possible_return_value[0] == key:
                 return possible_return_value[1]
             
             retrieval_collisions += 1
 
-        return
-    
-    def print_entire_map(self):
-        print("HashMap Contents:")
-        for index, bucket in enumerate(self.array):
-            if bucket:
-                print(f"Index {index} - Key: {bucket[0]}")
-                current_node = bucket[1].get_head_node() if bucket[1] else None
-                while current_node:
-                    print(f"  Fragrance: {current_node.name}, Categories: {current_node.scent_category}")
-                    current_node = current_node.next_node
-            else:
-                print(f"Index {index} - Empty")
-        print("\n------------------------------\n")
+        return None
 
 class TreeNode:
     def __init__(self, letter: str):
@@ -360,13 +345,15 @@ class WordTree:
           
 
         
-# main
 def main():
     print(ProgramRunner.intro_image)
     frag_finder = ProgramRunner()
-    first_filter, next_filter = frag_finder.get_all_filters()
-    frag_finder.print_filtered_content(first_filter, next_filter)
-
+    while True:
+        first_filter, next_filter = frag_finder.get_all_filters()
+        frag_finder.print_filtered_content(first_filter, next_filter)
+        if not frag_finder.again():
+            break
+    
 
 if __name__ == "__main__":
     main()
