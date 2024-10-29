@@ -12,7 +12,7 @@ import csv
 
 
 
-FRAG_FILE = 'Zach\'s Tried Fragrance List - non-formatted.csv'
+FRAG_FILE = "csv_folder/recommendation_list.csv"
 SCENT_SIZE = 80
 COST_SIZE = 6
 
