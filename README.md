@@ -1,2 +1,2 @@
-A Fragrance filtering program. I made it for a spreadsheet I had already. It is provided already.
+A Fragrance filtering program. I made it for a spreadsheet that is provided.
 This was for practice, since google sheets already has filtering in place.
